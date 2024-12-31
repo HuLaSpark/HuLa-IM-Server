@@ -3,8 +3,10 @@ package com.hula.core.chat.service.impl;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Pair;
 import com.hula.common.annotation.RedissonLock;
+import com.hula.common.domain.po.RoomChatInfoPO;
 import com.hula.common.domain.vo.req.CursorPageBaseReq;
 import com.hula.common.domain.vo.res.CursorPageBaseResp;
+import com.hula.common.domain.vo.res.GroupListVO;
 import com.hula.common.event.GroupMemberAddEvent;
 import com.hula.core.chat.dao.ContactDao;
 import com.hula.core.chat.dao.GroupMemberDao;
@@ -53,6 +55,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
@@ -80,7 +83,7 @@ public class RoomAppServiceImpl implements RoomAppService {
     private RoomService roomService;
     private GroupMemberCache groupMemberCache;
     private PushService pushService;
-
+    private TransactionTemplate transactionTemplate;
     @Override
     public CursorPageBaseResp<ChatRoomResp> getContactPage(CursorPageBaseReq request, Long uid) {
         // 查出用户要展示的会话列表
@@ -122,6 +125,11 @@ public class RoomAppServiceImpl implements RoomAppService {
         RoomFriend friendRoom = roomService.getFriendRoom(uid, friendUid);
         AssertUtil.isNotEmpty(friendRoom, "他不是您的好友");
         return buildContactResp(uid, Collections.singletonList(friendRoom.getRoomId())).getFirst();
+    }
+
+    @Override
+    public List<GroupListVO> groupList(Long uid) {
+        return roomService.groupList(uid);
     }
 
     @Override
@@ -239,21 +247,28 @@ public class RoomAppServiceImpl implements RoomAppService {
     }
 
     @Override
-    @Transactional
     public Long addGroup(Long uid, GroupAddReq request) {
-        RoomGroup roomGroup = roomService.createGroupRoom(uid);
-        // 批量保存群成员
-        List<GroupMember> groupMembers = RoomAdapter.buildGroupMemberBatch(request.getUidList(), roomGroup.getId());
-        groupMemberDao.saveBatch(groupMembers);
-
+        final RoomGroup[] roomGroup = new RoomGroup[1];
+        List<GroupMember> groupMembers = transactionTemplate.execute((status -> {
+            try {
+                roomGroup[0] = roomService.createGroupRoom(uid,request.getGroupName());
+                // 批量保存群成员
+                List<GroupMember> members = RoomAdapter.buildGroupMemberBatch(request.getUidList(), roomGroup[0].getId());
+                groupMemberDao.saveBatch(members);
+                return members;
+            } catch (Exception e) {
+                status.setRollbackOnly();
+                throw e;
+            }
+        }));
         User user = userInfoCache.get(uid);
         List<Long> uidList = groupMembers.stream().map(GroupMember::getUid).collect(Collectors.toList());
-        ChatMessageReq chatMessageReq = RoomAdapter.buildGroupAddMessage(roomGroup, user, userInfoCache.getBatch(uidList));
-        chatService.sendMsg(chatMessageReq, User.UID_SYSTEM);
+        ChatMessageReq chatMessageReq = RoomAdapter.buildGroupAddMessage(roomGroup[0], user, userInfoCache.getBatch(uidList));
+        chatService.sendMsg(chatMessageReq, uid);
 
         // 发送邀请加群消息==》触发每个人的会话
-        applicationEventPublisher.publishEvent(new GroupMemberAddEvent(this, roomGroup, groupMembers, uid));
-        return roomGroup.getRoomId();
+        applicationEventPublisher.publishEvent(new GroupMemberAddEvent(this, roomGroup[0], groupMembers, uid));
+        return roomGroup[0].getRoomId();
     }
 
     private boolean hasPower(GroupMember self) {
@@ -311,6 +326,7 @@ public class RoomAppServiceImpl implements RoomAppService {
     private List<ChatRoomResp> buildContactResp(Long uid, List<Long> roomIds) {
         // 表情和头像
         Map<Long, RoomBaseInfo> roomBaseInfoMap = getRoomBaseInfoMap(roomIds, uid);
+        Map<Long,Long> chatMap = getChat(uid,roomIds);
         // 最后一条消息
         List<Long> msgIds = roomBaseInfoMap.values().stream().map(RoomBaseInfo::getLastMsgId).collect(Collectors.toList());
         List<Message> messages = CollectionUtil.isEmpty(msgIds) ? new ArrayList<>() : messageDao.listByIds(msgIds);
@@ -320,9 +336,14 @@ public class RoomAppServiceImpl implements RoomAppService {
         Map<Long, Integer> unReadCountMap = getUnReadCountMap(uid, roomIds);
         return roomBaseInfoMap.values().stream().map(room -> {
                     ChatRoomResp resp = new ChatRoomResp();
-                    RoomBaseInfo roomBaseInfo = roomBaseInfoMap.get(room.getRoomId());
+                    Long roomId = room.getRoomId();
+                    RoomBaseInfo roomBaseInfo = roomBaseInfoMap.get(roomId);
+                    Long friendId = chatMap.get(roomId);
+                    if (Objects.nonNull(friendId)&&Objects.equals(room.getType(),RoomTypeEnum.FRIEND.getType())){
+                        resp.setFriendId(friendId);
+                    }
                     resp.setAvatar(roomBaseInfo.getAvatar());
-                    resp.setRoomId(room.getRoomId());
+                    resp.setRoomId(roomId);
                     resp.setActiveTime(room.getActiveTime());
                     resp.setHotFlag(roomBaseInfo.getHotFlag());
                     resp.setType(roomBaseInfo.getType());
@@ -337,10 +358,33 @@ public class RoomAppServiceImpl implements RoomAppService {
                             resp.setText(strategyNoNull.showContactMsg(message));
                         }
                     }
-                    resp.setUnreadCount(unReadCountMap.getOrDefault(room.getRoomId(), 0));
+                    resp.setUnreadCount(unReadCountMap.getOrDefault(roomId, 0));
                     return resp;
                 }).sorted(Comparator.comparing(ChatRoomResp::getActiveTime).reversed())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取单聊的对象map
+     * key->roomId
+     * v->单聊对象id
+     * @param uid     用户id
+     * @param roomIds 房间 ID
+     * @return {@link Map }<{@link Long }, {@link Long }>
+     */
+    private Map<Long, Long> getChat(Long uid, List<Long> roomIds) {
+        List<RoomChatInfoPO> poList = roomService.chatInfo(uid, roomIds, RoomTypeEnum.FRIEND.getType());
+        Map<Long, Long> map = new HashMap<>();
+        poList.forEach(e -> {
+            Long friendId;
+            if (Objects.equals(uid, e.getUid())) {
+                friendId = e.getFriendId();
+            } else {
+                friendId = e.getUid();
+            }
+            map.put(e.getRoomId(), friendId);
+        });
+        return map;
     }
 
     /**

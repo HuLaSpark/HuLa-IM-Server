@@ -1,6 +1,8 @@
 package com.hula.core.chat.service;
 
 
+import com.hula.common.domain.po.RoomChatInfoPO;
+import com.hula.common.domain.vo.res.GroupListVO;
 import com.hula.core.chat.domain.entity.RoomFriend;
 import com.hula.core.chat.domain.entity.RoomGroup;
 
@@ -28,7 +30,11 @@ public interface RoomService {
     /**
      * 创建一个群聊房间
      */
-    RoomGroup createGroupRoom(Long uid);
+    RoomGroup createGroupRoom(Long uid, String groupName);
 
+
+    List<RoomChatInfoPO> chatInfo(Long uid, List<Long> roomIds, int type);
+
+    List<GroupListVO> groupList(Long uid);
 
 }

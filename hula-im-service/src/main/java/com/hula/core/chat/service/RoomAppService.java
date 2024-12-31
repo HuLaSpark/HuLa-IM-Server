@@ -2,6 +2,7 @@ package com.hula.core.chat.service;
 
 import com.hula.common.domain.vo.req.CursorPageBaseReq;
 import com.hula.common.domain.vo.res.CursorPageBaseResp;
+import com.hula.common.domain.vo.res.GroupListVO;
 import com.hula.core.chat.domain.vo.request.ChatMessageMemberReq;
 import com.hula.core.chat.domain.vo.request.GroupAddReq;
 import com.hula.core.chat.domain.vo.request.member.MemberAddReq;
@@ -42,4 +43,5 @@ public interface RoomAppService {
 
     ChatRoomResp getContactDetailByFriend(Long uid, Long friendUid);
 
+    List<GroupListVO> groupList(Long uid);
 }

@@ -33,4 +33,6 @@ public class ChatRoomResp {
     private Date activeTime;
     @Schema(description ="未读数")
     private Integer unreadCount;
+    @Schema(description ="单聊时对方的id")
+    private Long friendId;
 }

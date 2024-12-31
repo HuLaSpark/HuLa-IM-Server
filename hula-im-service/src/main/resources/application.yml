@@ -2,10 +2,12 @@ server:
   port: 9190
 logging:
   level:
-    org.springframework.web: INFO
+    com.hula.service.web: INFO
     com.github.binarywang.demo.wx.mp: DEBUG
     me.chanjar.weixin: DEBUG
-
+  pattern:
+    dateformat: "yyyy-MM-dd HH:mm:ss"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread]-[%-3level ]-[tid：%X{tid}]-[%c]：%L：%m%n"
 spring:
   # 使用的配置文件
   profiles:

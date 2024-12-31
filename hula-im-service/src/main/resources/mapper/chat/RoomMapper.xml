@@ -2,4 +2,47 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.hula.core.chat.mapper.RoomMapper">
 
+
+    <select id="chatInfo" resultType="com.hula.common.domain.po.RoomChatInfoPO">
+        select f.room_id as roomId,
+        f.uid1 as uid,
+        f.uid2 as friendId
+        from room r
+        inner join room_friend f
+        on r.id = f.room_id
+        where f.uid1 = #{uid}
+        and r.type = #{type}
+        and f.status =0
+        and r.id in
+        <foreach collection="roomIds" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+        union
+        select f.room_id as roomId,
+        f.uid1 as uid,
+        f.uid2 as friendId
+        from room r
+        inner join room_friend f
+        on r.id = f.room_id
+        where f.uid2 = #{uid}
+        and r.type = #{type}
+        and f.status =0
+        and r.id in
+        <foreach collection="roomIds" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="groupList" resultType="com.hula.common.domain.vo.res.GroupListVO">
+        select r.id     as roomId,
+               g.name   as roomName,
+               g.avatar as avatar,
+               g.id     as groupId
+        from room_group g
+                 inner join room r on g.room_id = r.id
+                 inner join group_member m on g.id = m.group_id
+        where m.uid = #{uid}
+          and g.delete_status = 0
+        order by r.update_time,
+                 g.id
+    </select>
 </mapper>

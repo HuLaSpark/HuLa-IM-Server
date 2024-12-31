@@ -20,7 +20,10 @@ import java.util.List;
 @NoArgsConstructor
 public class GroupAddReq {
     @NotNull
-    @Size(min = 1, max = 50)
+    @Size(min = 1, max = 50,message = "只能邀请1-50人")
     @Schema(description ="邀请的uid")
     private List<Long> uidList;
+
+    @Schema(description ="群聊名称")
+    private String groupName;
 }

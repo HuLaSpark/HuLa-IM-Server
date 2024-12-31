@@ -55,8 +55,8 @@ public class BusinessException extends RuntimeException {
         return errorMsg;
     }
 
-    @Override
-    public synchronized Throwable fillInStackTrace() {
-        return this;
-    }
+//    @Override
+//    public synchronized Throwable fillInStackTrace() {
+//        return this;
+//    }
 }

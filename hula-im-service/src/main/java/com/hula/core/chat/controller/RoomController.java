@@ -3,6 +3,7 @@ package com.hula.core.chat.controller;
 
 import com.hula.common.domain.vo.req.IdReqVO;
 import com.hula.common.domain.vo.res.CursorPageBaseResp;
+import com.hula.common.domain.vo.res.GroupListVO;
 import com.hula.common.domain.vo.res.IdRespVO;
 import com.hula.core.chat.domain.vo.request.ChatMessageMemberReq;
 import com.hula.core.chat.domain.vo.request.GroupAddReq;
@@ -49,6 +50,16 @@ public class RoomController {
         return ApiResult.success(roomService.getGroupDetail(uid, request.getId()));
     }
 
+    /**
+     * 群聊列表
+     *
+     * @return {@link ApiResult }
+     */
+    @GetMapping("/group/list")
+    public ApiResult<List<GroupListVO>> groupList(){
+        Long uid = RequestHolder.get().getUid();
+        return ApiResult.success(roomService.groupList(uid));
+    }
     @GetMapping("/group/member/page")
     @Operation(summary ="群成员列表")
     public ApiResult<CursorPageBaseResp<ChatMemberResp>> getMemberPage(@Valid MemberReq request) {
@@ -109,4 +120,6 @@ public class RoomController {
         groupMemberService.revokeAdmin(uid, request);
         return ApiResult.success();
     }
+
+
 }

@@ -1,6 +1,7 @@
 package com.hula.core.chat.service.adapter;
 
 
+import cn.hutool.core.util.StrUtil;
 import com.hula.core.chat.domain.entity.Contact;
 import com.hula.core.chat.domain.entity.Room;
 import com.hula.core.chat.domain.entity.RoomFriend;
@@ -68,9 +69,13 @@ public class ChatAdapter {
         return Objects.equals(uid, roomFriend.getUid1()) ? roomFriend.getUid2() : roomFriend.getUid1();
     }
 
-    public static RoomGroup buildGroupRoom(User user, Long roomId) {
+    public static RoomGroup buildGroupRoom(User user, Long roomId, String groupName) {
         RoomGroup roomGroup = new RoomGroup();
-        roomGroup.setName(user.getName() + "的群组");
+        if (StrUtil.isEmpty(groupName)){
+            roomGroup.setName(user.getName() + "的群组");
+        }else {
+            roomGroup.setName(groupName);
+        }
         roomGroup.setAvatar(user.getAvatar());
         roomGroup.setRoomId(roomId);
         return roomGroup;

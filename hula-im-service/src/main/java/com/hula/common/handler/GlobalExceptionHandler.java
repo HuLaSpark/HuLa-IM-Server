@@ -9,9 +9,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 
-
 /**
  * 自定义全局异常捕获
+ *
  * @author nyh
  */
 @RestControllerAdvice
@@ -34,14 +34,14 @@ public class GlobalExceptionHandler {
      * 业务异常
      */
     @ExceptionHandler(value = BusinessException.class)
-    public ApiResult businessExceptionHandler(BusinessException e) {
-        log.info("business exception！The reason is：{}", e.getMessage(), e);
+    public ApiResult<String> businessExceptionHandler(BusinessException e) {
+        log.error(String.format("business exception！The reason is: %s", e.getMessage()), e);
         return ApiResult.fail(e.getErrorCode(), e.getMessage());
     }
 
     @ExceptionHandler(value = Throwable.class)
-    public ApiResult throwableExceptionHandler(Throwable e) {
-        log.error("system error！The reason is:{}", e.getMessage(), e);
+    public ApiResult<String> throwableExceptionHandler(Throwable e) {
+        log.error(String.format("system error！The reason is: %s", e.getMessage()), e);
         return ApiResult.fail(CommonErrorEnum.SYSTEM_ERROR.getErrorCode(), CommonErrorEnum.SYSTEM_ERROR.getErrorMsg());
     }
 }

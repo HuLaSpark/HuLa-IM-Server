@@ -1,5 +1,7 @@
 package com.hula.core.chat.service.impl;
 
+import com.hula.common.domain.po.RoomChatInfoPO;
+import com.hula.common.domain.vo.res.GroupListVO;
 import com.hula.common.enums.NormalOrNoEnum;
 import com.hula.utils.AssertUtil;
 import com.hula.core.chat.dao.GroupMemberDao;
@@ -69,14 +71,13 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public RoomGroup createGroupRoom(Long uid) {
+    public RoomGroup createGroupRoom(Long uid, String groupName) {
         List<GroupMember> selfGroup = groupMemberDao.getSelfGroup(uid);
-        AssertUtil.isEmpty(selfGroup, "每个人只能创建一个群");
+        AssertUtil.isTrue(selfGroup.size()<6, "每个人只能创建五个群");
         User user = userInfoCache.get(uid);
         Room room = createRoom(RoomTypeEnum.GROUP);
         // 插入群
-        RoomGroup roomGroup = ChatAdapter.buildGroupRoom(user, room.getId());
+        RoomGroup roomGroup = ChatAdapter.buildGroupRoom(user, room.getId(),groupName);
         roomGroupDao.save(roomGroup);
         // 插入群主
         GroupMember leader = GroupMember.builder()
@@ -86,6 +87,16 @@ public class RoomServiceImpl implements RoomService {
                 .build();
         groupMemberDao.save(leader);
         return roomGroup;
+    }
+
+    @Override
+    public List<RoomChatInfoPO> chatInfo(Long uid, List<Long> roomIds, int type) {
+        return roomDao.chatInfo(uid,roomIds,type);
+    }
+
+    @Override
+    public List<GroupListVO> groupList(Long uid) {
+        return roomDao.groupList(uid);
     }
 
     private RoomFriend createFriendRoom(Long roomId, List<Long> uidList) {
